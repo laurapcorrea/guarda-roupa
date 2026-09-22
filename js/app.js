@@ -38,7 +38,7 @@
   var byId = {}; itens.forEach(function (i) { byId[i.id] = i; });
 
   var S = { tab: "pecas", cat: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {} };
-  var CFG = { prov: "gemini", gkey: "", xkey: "", rosto: "" };
+  var CFG = { prov: "puter", gkey: "", xkey: "", rosto: "" };
 
   function load() {
     try {
@@ -192,10 +192,66 @@
       });
   }
 
-  function gerar(prompt, imgs) {
-    return CFG.prov === "grok" ? grokImagem(prompt, imgs) : geminiImagem(prompt, imgs);
+
+  /* Puter: Nano Banana de graça, sem chave. A Laura entra na conta Puter dela
+     uma vez e o uso corre pela cota gratuita dela, não pela minha. */
+  function puterPronto() {
+    if (window.puter && window.puter.ai && window.puter.ai.txt2img) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var t = 0, iv = setInterval(function () {
+        if (window.puter && window.puter.ai && window.puter.ai.txt2img) { clearInterval(iv); res(); }
+        else if (++t > 80) { clearInterval(iv); rej(new Error("o Puter não carregou, confira a conexão")); }
+      }, 250);
+    });
   }
-  function temIA() { return CFG.prov === "grok" ? !!CFG.xkey : !!CFG.gkey; }
+
+  function juntarImgs(imgs) {
+    if (!imgs || !imgs.length) return Promise.resolve(null);
+    if (imgs.length === 1) return Promise.resolve(imgs[0]);
+    return Promise.all(imgs.map(loadImg)).then(function (ims) {
+      var H = 1024, W = 0;
+      var ws = ims.map(function (im) { var w = Math.round(im.naturalWidth * H / im.naturalHeight); W += w; return w; });
+      var c = document.createElement("canvas"); c.width = W; c.height = H;
+      var x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, W, H);
+      var ox = 0;
+      ims.forEach(function (im, i) { x.drawImage(im, ox, 0, ws[i], H); ox += ws[i]; });
+      return c.toDataURL("image/jpeg", 0.9);
+    });
+  }
+
+  function paraDataUrl(src) {
+    if (!src) return Promise.reject(new Error("o Puter respondeu sem imagem"));
+    if (src.indexOf("data:") === 0) return Promise.resolve(src);
+    return fetch(src).then(function (r) { return r.blob(); }).then(function (b) {
+      return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.readAsDataURL(b); });
+    });
+  }
+
+  function puterImagem(prompt, imgs) {
+    return puterPronto().then(function () { return juntarImgs(imgs); }).then(function (one) {
+      var o = { model: CFG.pmodel || "google/gemini-3.1-flash-image-preview" };
+      if (one) { o.input_image = b64(one); o.input_image_mime_type = mime(one); }
+      return window.puter.ai.txt2img(prompt, o);
+    }).then(function (r) {
+      var src = r && r.src ? r.src : (typeof r === "string" ? r : null);
+      return paraDataUrl(src);
+    }).catch(function (e) {
+      var msg = String((e && (e.message || e.error || e)) || "erro no Puter");
+      if (/sign|auth|login/i.test(msg)) msg = "entre na conta Puter na janelinha que abriu e tente de novo";
+      throw new Error(msg);
+    });
+  }
+
+  function gerar(prompt, imgs) {
+    if (CFG.prov === "grok") return grokImagem(prompt, imgs);
+    if (CFG.prov === "gemini") return geminiImagem(prompt, imgs);
+    return puterImagem(prompt, imgs);
+  }
+  function temIA() {
+    if (CFG.prov === "grok") return !!CFG.xkey;
+    if (CFG.prov === "gemini") return !!CFG.gkey;
+    return true;
+  }
 
   /* ---------------- filtros e grade ---------------- */
   function listaFiltrada() {
@@ -524,7 +580,7 @@
     abrirModal(function (m) {
       cabeca(m, "IA e backup", "as chaves ficam só neste aparelho");
       var f0 = el("label", "field"); f0.innerHTML = '<span class="k">Gerador</span><select id="cProv">' +
-        '<option value="gemini">Google Gemini</option><option value="grok">Grok (xAI)</option></select>';
+        '<option value="puter">Puter · Nano Banana (grátis)</option><option value="gemini">Google Gemini</option><option value="grok">Grok (xAI)</option></select>';
       m.appendChild(f0);
       var f1 = el("label", "field"); f1.innerHTML = '<span class="k">Key do Gemini</span><input id="cG" placeholder="AQ..." autocomplete="off">';
       m.appendChild(f1);
@@ -573,7 +629,8 @@
       m.appendChild(r);
 
       var p = el("p", "note"); p.style.marginTop = "16px";
-      p.innerHTML = "<b>Gemini:</b> precisa de faturamento ativo no projeto da key pra gerar imagem (uns US$ 0,04 por foto). " +
+      p.innerHTML = "<b>Puter:</b> grátis e sem chave. Na primeira geração abre uma janelinha pra entrar (ou criar) uma conta Puter, e o uso corre pela cota gratuita dela. " +
+        "<b>Gemini:</b> precisa de faturamento ativo no projeto da key (uns US$ 0,04 por foto). " +
         "<b>Grok:</b> key de API do console.x.ai, cobrada por imagem. Os looks e as peças ficam salvos neste navegador, use o backup pra levar pra outro aparelho.";
       m.appendChild(p);
     });
