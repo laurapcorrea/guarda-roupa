@@ -12,8 +12,21 @@
     { id: "vestido", nome: "Vestidos" },
     { id: "casaco", nome: "Casacos" },
     { id: "calcado", nome: "Calçados" },
-    { id: "acessorio", nome: "Acessórios" }
+    { id: "acessorio", nome: "Acessórios" },
+    { id: "joia", nome: "Joias" },
+    { id: "chapeu", nome: "Chapéus" }
   ];
+  // sub-filtros no estilo do Google: aparecem quando uma categoria é escolhida
+  var SUBS = {
+    top: ["alça", "manga curta", "manga longa"],
+    bottom: ["calça", "short", "saia"],
+    casaco: ["blazer", "jaqueta", "sobretudo", "cardigã", "kimono"],
+    calcado: ["tênis", "bota", "sandália", "sapato", "chinelo"],
+    acessorio: ["bolsa", "cinto", "óculos", "lenço"],
+    joia: ["colar", "brinco", "relógio"],
+    chapeu: ["boné", "gorro"],
+    vestido: ["vestido", "macaquinho"]
+  };
   var SLOTS = [
     { role: "top", label: "Cima", cat: "top" },
     { role: "bottom", label: "Baixo", cat: "bottom" },
@@ -29,7 +42,7 @@
   var ACC_POS = [{ l: 5, t: 76, w: 19 }, { l: 27, t: 79, w: 17 }, { l: 47, t: 82, w: 16 }, { l: 66, t: 84, w: 15 }];
 
   var PROMPT_PRODUTO = "foto de produto desta peça de roupa, vestida em manequim invisível, esticada sem amassados, fundo branco puro, luz de estúdio suave, vista frontal centralizada, peça inteira visível, sem pessoa, sem sombra no chão";
-  var PROMPT_LOOK = "a mesma mulher das fotos de referência usando exatamente este look completo, corpo inteiro, de pé, fundo branco puro, luz de estúdio suave, foto de moda realista, sem alterar o rosto";
+  var PROMPT_LOOK = "a modelo da primeira imagem vestindo exatamente as peças da segunda imagem, mesma pose de pé de frente, corpo inteiro dos pés à cabeça, mesmo rosto e mesmo cabelo, fundo branco liso, luz de estúdio suave e uniforme, foto de catálogo realista, roupas caindo naturalmente no corpo, sem alterar o rosto, sem texto";
 
   /* ---------------- estado ---------------- */
   var itens = window.CATALOGO.map(function (r) {
@@ -37,8 +50,9 @@
   });
   var byId = {}; itens.forEach(function (i) { byId[i.id] = i; });
 
-  var S = { tab: "pecas", cat: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {} };
+  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {} };
   var CFG = { prov: "puter", gkey: "", xkey: "", rosto: "" };
+  function rostoRef() { return CFG.rosto || window.AVATAR_PADRAO || ""; }
 
   function load() {
     try {
@@ -258,6 +272,7 @@
     var q = S.q.trim().toLowerCase();
     return itens.filter(function (i) {
       if (S.cat !== "todas" && i.cat !== S.cat) return false;
+      if (S.sub && S.sub !== "todas" && i.sub !== S.sub) return false;
       if (q && (i.nome + " " + i.sub + " " + i.cat).toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -269,10 +284,27 @@
         var n = c.id === "todas" ? itens.length : itens.filter(function (i) { return i.cat === c.id; }).length;
         var b = el("button", "chip"); b.innerHTML = c.nome + '<span class="n">' + n + "</span>";
         b.setAttribute("aria-pressed", String(S.cat === c.id));
-        b.onclick = function () { S.cat = c.id; railRender(); gridRender(); };
+        b.onclick = function () { S.cat = c.id; S.sub = "todas"; railRender(); gridRender(); };
         r.appendChild(b);
       });
+      var subs = SUBS[S.cat];
+      if (subs) {
+        var r2 = $("#rail2"); r2.innerHTML = ""; r2.hidden = false;
+        var tb = el("button", "chip sub", "Tudo");
+        tb.setAttribute("aria-pressed", String(!S.sub || S.sub === "todas"));
+        tb.onclick = function () { S.sub = "todas"; railRender(); gridRender(); };
+        r2.appendChild(tb);
+        subs.forEach(function (sb) {
+          var n = itens.filter(function (i) { return i.cat === S.cat && i.sub === sb; }).length;
+          if (!n) return;
+          var b2 = el("button", "chip sub"); b2.innerHTML = sb + '<span class="n">' + n + "</span>";
+          b2.setAttribute("aria-pressed", String(S.sub === sb));
+          b2.onclick = function () { S.sub = sb; railRender(); gridRender(); };
+          r2.appendChild(b2);
+        });
+      } else { $("#rail2").hidden = true; }
     } else {
+      $("#rail2").hidden = true;
       [["todas", "Todas"], ["V", "Verão"], ["O", "Outono"], ["I", "Inverno"], ["P", "Primavera"]].forEach(function (e) {
         var b = el("button", "chip", e[1]);
         b.setAttribute("aria-pressed", String(S.est === e[0]));
@@ -512,10 +544,10 @@
 
   function gerarLook(o, btn) {
     if (!temIA()) { abrirConfig(); return; }
-    if (!CFG.rosto) { toast("Suba uma foto sua na engrenagem primeiro"); abrirConfig(); return; }
+    
     btn.setAttribute("disabled", ""); btn.innerHTML = svg(IC.spark) + " Gerando…";
     montarFlatLay(o.itens).then(function (lay) {
-      var imgs = CFG.prov === "grok" ? [lay] : [CFG.rosto, lay];
+      var imgs = CFG.prov === "grok" ? [lay] : [rostoRef(), lay];
       return gerar(PROMPT_LOOK, imgs);
     }).then(function (out) {
       return loadImg(out).then(function (im) {
@@ -588,10 +620,10 @@
       m.appendChild(f2);
       $("#cProv").value = CFG.prov; $("#cG").value = CFG.gkey || ""; $("#cX").value = CFG.xkey || "";
 
-      var lab = el("div", "field"); lab.innerHTML = '<span class="k">Sua foto de referência (rosto e corpo)</span>'; m.appendChild(lab);
+      var lab = el("div", "field"); lab.innerHTML = '<span class="k">Avatar usado para vestir os looks</span>'; m.appendChild(lab);
       var prev = el("div"); prev.style.cssText = "display:flex;gap:10px;align-items:center;margin-bottom:14px";
-      if (CFG.rosto) { var im = el("img"); im.src = CFG.rosto; im.style.cssText = "width:78px;height:98px;object-fit:cover"; prev.appendChild(im); }
-      var up = el("button", "btn sm"); up.innerHTML = svg(IC.plus) + (CFG.rosto ? " Trocar" : " Subir foto");
+      var im = el("img"); im.src = rostoRef(); im.style.cssText = "width:78px;height:98px;object-fit:cover"; prev.appendChild(im);
+      var up = el("button", "btn sm"); up.innerHTML = svg(IC.plus) + (CFG.rosto ? " Trocar" : " Trocar o avatar padrão");
       var fi = el("input"); fi.type = "file"; fi.accept = "image/*"; fi.style.display = "none";
       up.onclick = function () { fi.click(); };
       fi.onchange = function (e) {

@@ -222,3 +222,12 @@ button{background:none; border:0; cursor:pointer; padding:0}
 .bar i{display:block; height:100%; width:30%; background:var(--tang); animation:sl 1.1s infinite ease-in-out}
 @keyframes sl{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+
+/* sub-filtros */
+.rail-sub { padding-top: 0; padding-bottom: 10px; }
+.rail-sub .chip {
+  font-size: 11px; letter-spacing: .02em; text-transform: none;
+  padding: 6px 11px; background: transparent; border: 1px solid rgba(14,14,16,.14);
+}
+.rail-sub .chip[aria-pressed="true"] { background: var(--mint); border-color: var(--mint); color: var(--ink); }
+.rail-sub .chip .n { opacity: .5; margin-left: 5px; }
