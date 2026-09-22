@@ -61,6 +61,11 @@
   });
   var byId = {}; itens.forEach(function (i) { byId[i.id] = i; });
   function aplicarEdicoes() {
+    Object.keys(S.del || {}).forEach(function (id) {
+      var i = itens.map(function (x) { return x.id; }).indexOf(id);
+      if (i >= 0) itens.splice(i, 1);
+      delete byId[id];
+    });
     Object.keys(S.edit || {}).forEach(function (id) {
       var it = byId[id], e = S.edit[id]; if (!it || !e) return;
       it.nome = e.nome || it.nome; it.cat = e.cat || it.cat; it.sub = e.sub || it.sub;
@@ -68,21 +73,21 @@
     });
   }
 
-  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {}, edit: {} };
+  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {}, edit: {}, del: {} };
   var CFG = { prov: "puter", gkey: "", xkey: "", rosto: "" };
   function rostoRef() { return CFG.rosto || window.AVATAR_PADRAO || ""; }
 
   function load() {
     try {
       var a = JSON.parse(localStorage.getItem("gr_state") || "{}");
-      S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {}; S.edit = a.edit || {};
+      S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {}; S.edit = a.edit || {}; S.del = a.del || {};
     } catch (e) {}
     try { CFG = Object.assign(CFG, JSON.parse(localStorage.getItem("gr_cfg") || "{}")); } catch (e) {}
     S.extra.forEach(function (it) { if (!byId[it.id]) { itens.push(it); byId[it.id] = it; } });
     Object.keys(S.fix).forEach(function (id) { if (byId[id]) { byId[id].src = S.fix[id]; byId[id].pendente = false; } });
   }
   function save() {
-    try { localStorage.setItem("gr_state", JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit })); }
+    try { localStorage.setItem("gr_state", JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del })); }
     catch (e) { toast("Memória do navegador cheia. Exporte o backup."); }
   }
   function saveCfg() { try { localStorage.setItem("gr_cfg", JSON.stringify(CFG)); } catch (e) {} }
@@ -351,9 +356,12 @@
 
   /* ---------------- modal ---------------- */
   function fechar() { $("#modalRoot").innerHTML = ""; document.body.style.overflow = ""; }
-  function abrirModal(build) {
+  var VOLTAR = null;
+  function abrirModal(build, aoFechar) {
     var root = $("#modalRoot"); root.innerHTML = "";
-    var sc = el("div", "scrim"); sc.onclick = fechar;
+    var sc = el("div", "scrim");
+    sc.onclick = function () { fechar(); if (aoFechar) aoFechar(); };
+    VOLTAR = aoFechar || null;
     var m = el("div", "modal"); m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true");
     root.appendChild(sc); root.appendChild(m); document.body.style.overflow = "hidden";
     build(m); m.scrollTop = 0; return m;
@@ -361,11 +369,36 @@
   function cabeca(m, t, s) {
     var h = el("div", "mhead"), left = el("div");
     left.appendChild(el("h2", null, t)); if (s) left.appendChild(el("p", null, s));
-    var x = el("button", "sq"); x.innerHTML = svg('<path d="M6 6l12 12M18 6 6 18"/>'); x.onclick = fechar;
+    var x = el("button", "sq"); x.innerHTML = svg('<path d="M6 6l12 12M18 6 6 18"/>');
+    x.onclick = function () { var v = VOLTAR; fechar(); if (v) v(); };
     h.appendChild(left); h.appendChild(x); m.appendChild(h);
   }
 
   /* ---------------- peça ---------------- */
+
+
+  function confirmarExclusao(it) {
+    abrirModal(function (m) {
+      cabeca(m, "Tirar do guarda-roupa?", it.nome);
+      var p = el("p", "note");
+      p.textContent = "A peça some da lista e dos filtros. Os looks que já usam ela continuam salvos. Dá pra trazer de volta em Restaurar, na engrenagem.";
+      m.appendChild(p);
+      var r = el("div", "row"); r.style.marginTop = "16px";
+      var bx = el("button", "btn solid"); bx.style.background = "var(--coral)"; bx.style.color = "#fff";
+      bx.textContent = "Sim, tirar";
+      bx.onclick = function () {
+        S.del[it.id] = 1; save();
+        var i = itens.indexOf(it); if (i >= 0) itens.splice(i, 1);
+        delete byId[it.id];
+        fechar(); railRender(); gridRender(); toast("Peça removida.");
+      };
+      r.appendChild(bx);
+      var bn = el("button", "btn ghost", "Cancelar");
+      bn.onclick = function () { fechar(); abrirPeca(it); };
+      r.appendChild(bn);
+      m.appendChild(r);
+    });
+  }
 
   function editarPeca(it) {
     abrirModal(function (m) {
@@ -460,6 +493,10 @@
       var b3 = el("button", "btn ghost", "Editar");
       b3.onclick = function () { fechar(); editarPeca(it); };
       r.appendChild(b3);
+      var b4 = el("button", "btn ghost", "Excluir");
+      b4.style.color = "var(--coral)";
+      b4.onclick = function () { confirmarExclusao(it); };
+      r.appendChild(b4);
       m.appendChild(r);
       var p = el("p", "note"); p.style.marginTop = "14px";
       p.innerHTML = temIA() ? "A IA devolve a peça em fundo branco e o site recorta sozinho." :
@@ -535,7 +572,7 @@
           b.appendChild(x);
         } else { b.appendChild(el("span", "plus", "+")); }
         b.appendChild(el("span", "k", s.label));
-        b.onclick = function () { escolher(s.cat, function (pid) { S.sel[s.role] = pid; redraw(); }); };
+        b.onclick = function () { escolher(s.cat, function (pid) { S.sel[s.role] = pid; redraw(); }, false, function () { abrirMontador(edit); }); };
         sl.appendChild(b);
       });
       m.appendChild(sl);
@@ -549,7 +586,7 @@
         strip.appendChild(a);
       });
       var add = el("button", "add", "+");
-      add.onclick = function () { escolher("acessorio", function (pid) { if (S.acc.indexOf(pid) < 0) S.acc.push(pid); redraw(); }, true); };
+      add.onclick = function () { escolher("acessorio", function (pid) { if (S.acc.indexOf(pid) < 0) S.acc.push(pid); redraw(); }, true, function () { abrirMontador(edit); }); };
       strip.appendChild(add); m.appendChild(strip);
 
       var two = el("div", "two");
@@ -569,11 +606,33 @@
     });
   }
 
-  function escolher(cat, cb, multi) {
+  // o que cada caixa aceita além da própria categoria (camisa serve de casaco, etc)
+  var EXTRA_SLOT = {
+    casaco: function (i) { return i.cat === "top" && i.sub === "manga longa"; },
+    top: function (i) { return i.cat === "vestido"; },
+    vestido: function (i) { return false; },
+    bottom: function (i) { return false; },
+    calcado: function (i) { return false; }
+  };
+
+  function escolher(cat, cb, multi, voltar) {
     var grupos = cat === "acessorio" ? ["acessorio", "joia", "chapeu"] : [cat];
-    var l = itens.filter(function (i) { return grupos.indexOf(i.cat) >= 0; });
+    var base = itens.filter(function (i) { return grupos.indexOf(i.cat) >= 0; });
+    var extraFn = EXTRA_SLOT[cat];
+    var extra = extraFn ? itens.filter(function (i) { return grupos.indexOf(i.cat) < 0 && extraFn(i); }) : [];
+    var l = base.concat(extra);
     abrirModal(function (m) {
       cabeca(m, cat === "acessorio" ? "Acessórios, joias e chapéus" : ((CATS.filter(function (c) { return c.id === cat; })[0] || {}).nome || cat), l.length + " opções" + (multi ? " · pode escolher vários" : ""));
+      if (!multi) {
+        var rv = el("div", "row"); rv.style.margin = "0 0 12px";
+        var bv = el("button", "btn ghost sm", "Voltar sem escolher");
+        bv.onclick = function () { fechar(); if (voltar) voltar(); };
+        rv.appendChild(bv);
+        var bt = el("button", "btn ghost sm", "Ver todas as peças");
+        bt.onclick = function () { l = itens.slice(); fechar(); escolherTudo(cat, cb, voltar); };
+        rv.appendChild(bt);
+        m.appendChild(rv);
+      }
       if (multi) {
         var fr = el("div", "rail rail-sub"); fr.style.marginBottom = "10px";
         var atual = { v: "todas" };
@@ -608,7 +667,21 @@
         var b = el("button", "btn mint"); b.innerHTML = svg(IC.check) + " Pronto";
         b.onclick = function () { fechar(); abrirMontador(); }; r.appendChild(b); m.appendChild(r);
       }
-    });
+    }, voltar);
+  }
+
+  // lista o guarda-roupa inteiro, pra quando a peça certa mora em outra categoria
+  function escolherTudo(cat, cb, voltar) {
+    abrirModal(function (m) {
+      cabeca(m, "Todas as peças", itens.length + " opções · escolha qualquer uma pra essa caixa");
+      var rv = el("div", "row"); rv.style.margin = "0 0 12px";
+      var bv = el("button", "btn ghost sm", "Voltar");
+      bv.onclick = function () { fechar(); escolher(cat, cb, false, voltar); };
+      rv.appendChild(bv); m.appendChild(rv);
+      var g = el("div", "grid");
+      itens.forEach(function (i) { g.appendChild(tile(i, function () { cb(i.id); })); });
+      m.appendChild(g);
+    }, voltar);
   }
 
   function salvarLook(edit) {
@@ -766,7 +839,7 @@
       r.appendChild(bs);
       var be = el("button", "btn ghost"); be.innerHTML = svg(IC.down) + " Backup";
       be.onclick = function () {
-        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit }, null, 1)], { type: "application/json" });
+        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del }, null, 1)], { type: "application/json" });
         var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
         a.download = "guarda-roupa-backup.json"; a.click();
       };
@@ -778,7 +851,7 @@
         var f = e.target.files && e.target.files[0]; if (!f) return;
         f.text().then(function (t) {
           var d = JSON.parse(t);
-          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {}; S.edit = d.edit || {};
+          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {}; S.edit = d.edit || {}; S.del = d.del || {};
           save(); location.reload();
         }).catch(function () { toast("Arquivo inválido"); });
       };

@@ -239,3 +239,5 @@ button{background:none; border:0; cursor:pointer; padding:0}
   font: inherit; font-size: 14px; letter-spacing: -.01em; resize: vertical;
 }
 .field textarea:focus { outline: none; border-color: var(--ink); }
+
+.btn.sm { padding: 7px 12px; font-size: 11px; }
