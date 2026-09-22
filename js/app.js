@@ -273,8 +273,13 @@
       var src = r && r.src ? r.src : (typeof r === "string" ? r : null);
       return paraDataUrl(src);
     }).catch(function (e) {
+      var bruto = (e && (e.message || e.error || e.code || "")) + " " + JSON.stringify(e || {});
       var msg = String((e && (e.message || e.error || e)) || "erro no Puter");
-      if (/sign|auth|login/i.test(msg)) msg = "entre na conta Puter na janelinha que abriu e tente de novo";
+      if (/sign|auth|login/i.test(bruto)) {
+        msg = "entre na conta Puter na janelinha que abriu e tente de novo";
+      } else if (/balance|funding|insufficient|upgrade|quota|credit/i.test(bruto)) {
+        msg = "a franquia grátis do Puter deste mês acabou. Ela renova na virada do mês. Pra gerar agora, troque o gerador na engrenagem pra Gemini ou Grok.";
+      }
       throw new Error(msg);
     });
   }
@@ -519,7 +524,7 @@
         S.fix[it.id] = webp; save(); fechar(); gridRender(); toast("Foto tratada e salva.");
       }).catch(function (e) {
         bar.remove(); btn.removeAttribute("disabled"); btn.innerHTML = svg(IC.spark) + " Tentar de novo";
-        toast(String(e.message || e).slice(0, 120));
+        toast(String(e.message || e).slice(0, 190));
       });
   }
 
@@ -758,7 +763,7 @@
       o.lookUrl = jpg; save(); looksRender(); toast("Look gerado.");
     }).catch(function (e) {
       btn.removeAttribute("disabled"); btn.innerHTML = svg(IC.spark) + " Tentar de novo";
-      toast(String(e.message || e).slice(0, 130));
+      toast(String(e.message || e).slice(0, 190));
     });
   }
 
@@ -859,7 +864,7 @@
       m.appendChild(r);
 
       var p = el("p", "note"); p.style.marginTop = "16px";
-      p.innerHTML = "<b>Puter:</b> grátis e sem chave. Na primeira geração abre uma janelinha pra entrar (ou criar) uma conta Puter, e o uso corre pela cota gratuita dela. " +
+      p.innerHTML = "<b>Puter:</b> grátis e sem chave, com franquia mensal que renova na virada do mês. Se aparecer <i>Low Balance</i>, a franquia do mês acabou: espere virar o mês ou troque o gerador aqui. " +
         "<b>Gemini:</b> precisa de faturamento ativo no projeto da key (uns US$ 0,04 por foto). " +
         "<b>Grok:</b> key de API do console.x.ai, cobrada por imagem. Os looks e as peças ficam salvos neste navegador, use o backup pra levar pra outro aparelho.";
       m.appendChild(p);
