@@ -41,30 +41,48 @@
   };
   // faixa de acessórios: linha limpa embaixo, distribuída conforme a quantidade
 
+  function promptProduto(it) {
+    var p = PROMPT_PRODUTO + ". a peça é: " + it.nome;
+    if (it.det) p += ". detalhes importantes, respeite exatamente: " + it.det;
+    p += ". mantenha a cor e o tecido idênticos aos da foto, não clareie nem troque o material";
+    return p;
+  }
+  function promptLook(ids) {
+    var det = (ids || []).map(function (id) { return byId[id]; }).filter(Boolean)
+      .map(function (i) { return i.nome + (i.det ? " (" + i.det + ")" : ""); }).join("; ");
+    return PROMPT_LOOK + (det ? ". as peças são: " + det : "");
+  }
   var PROMPT_PRODUTO = "foto de produto desta peça de roupa, vestida em manequim invisível, esticada sem amassados, fundo branco puro, luz de estúdio suave, vista frontal centralizada, peça inteira visível, sem pessoa, sem sombra no chão";
   var PROMPT_LOOK = "a modelo da primeira imagem vestindo exatamente as peças da segunda imagem, mesma pose de pé de frente, corpo inteiro dos pés à cabeça, mesmo rosto e mesmo cabelo, fundo branco liso, luz de estúdio suave e uniforme, foto de catálogo realista, roupas caindo naturalmente no corpo, sem alterar o rosto, sem texto";
 
   /* ---------------- estado ---------------- */
   var itens = window.CATALOGO.map(function (r) {
-    return { id: r[0], nome: r[1], cat: r[2], sub: r[3], est: r[4], novo: !!r[5], pendente: r[5] === 1, src: "img/" + r[0] + ".webp" };
+    return { id: r[0], nome: r[1], cat: r[2], sub: r[3], est: r[4], novo: !!r[5], pendente: r[5] === 1, det: r[6] || "", src: "img/" + r[0] + ".webp" };
   });
   var byId = {}; itens.forEach(function (i) { byId[i.id] = i; });
+  function aplicarEdicoes() {
+    Object.keys(S.edit || {}).forEach(function (id) {
+      var it = byId[id], e = S.edit[id]; if (!it || !e) return;
+      it.nome = e.nome || it.nome; it.cat = e.cat || it.cat; it.sub = e.sub || it.sub;
+      it.est = e.est || it.est; it.det = e.det || "";
+    });
+  }
 
-  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {} };
+  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {}, edit: {} };
   var CFG = { prov: "puter", gkey: "", xkey: "", rosto: "" };
   function rostoRef() { return CFG.rosto || window.AVATAR_PADRAO || ""; }
 
   function load() {
     try {
       var a = JSON.parse(localStorage.getItem("gr_state") || "{}");
-      S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {};
+      S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {}; S.edit = a.edit || {};
     } catch (e) {}
     try { CFG = Object.assign(CFG, JSON.parse(localStorage.getItem("gr_cfg") || "{}")); } catch (e) {}
     S.extra.forEach(function (it) { if (!byId[it.id]) { itens.push(it); byId[it.id] = it; } });
     Object.keys(S.fix).forEach(function (id) { if (byId[id]) { byId[id].src = S.fix[id]; byId[id].pendente = false; } });
   }
   function save() {
-    try { localStorage.setItem("gr_state", JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix })); }
+    try { localStorage.setItem("gr_state", JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit })); }
     catch (e) { toast("Memória do navegador cheia. Exporte o backup."); }
   }
   function saveCfg() { try { localStorage.setItem("gr_cfg", JSON.stringify(CFG)); } catch (e) {} }
@@ -348,6 +366,76 @@
   }
 
   /* ---------------- peça ---------------- */
+
+  function editarPeca(it) {
+    abrirModal(function (m) {
+      cabeca(m, "Editar peça", "o que você escrever aqui vai junto no pedido pra IA");
+
+      var fn = el("label", "field");
+      fn.innerHTML = '<span class="k">Nome</span><input id="eNome" autocomplete="off">';
+      m.appendChild(fn); $("#eNome").value = it.nome;
+
+      var fc = el("label", "field");
+      fc.innerHTML = '<span class="k">Categoria</span><select id="eCat">' +
+        CATS.filter(function (c) { return c.id !== "todas"; })
+            .map(function (c) { return '<option value="' + c.id + '">' + c.nome + "</option>"; }).join("") + "</select>";
+      m.appendChild(fc); $("#eCat").value = it.cat;
+
+      var fs = el("label", "field");
+      fs.innerHTML = '<span class="k">Tipo</span><select id="eSub"></select>';
+      m.appendChild(fs);
+      function subs() {
+        var l = SUBS[$("#eCat").value] || [it.sub];
+        $("#eSub").innerHTML = l.map(function (x) { return '<option value="' + x + '">' + x + "</option>"; }).join("");
+        $("#eSub").value = l.indexOf(it.sub) >= 0 ? it.sub : l[0];
+      }
+      subs(); $("#eCat").onchange = subs;
+
+      var fe = el("div", "field");
+      fe.innerHTML = '<span class="k">Estações</span><div id="eEst" class="rail rail-sub"></div>';
+      m.appendChild(fe);
+      var atual = it.est.split("");
+      [["V", "Verão"], ["O", "Outono"], ["I", "Inverno"], ["P", "Primavera"]].forEach(function (e) {
+        var b = el("button", "chip sub", e[1]);
+        b.setAttribute("aria-pressed", String(atual.indexOf(e[0]) >= 0));
+        b.onclick = function () {
+          var i = atual.indexOf(e[0]);
+          if (i >= 0) atual.splice(i, 1); else atual.push(e[0]);
+          b.setAttribute("aria-pressed", String(atual.indexOf(e[0]) >= 0));
+        };
+        $("#eEst").appendChild(b);
+      });
+
+      var fd = el("label", "field");
+      fd.innerHTML = '<span class="k">Detalhes pra IA</span>' +
+        '<textarea id="eDet" rows="3" placeholder="tecido de tule transparente marrom, gola alta, manga longa · ou: preta mesmo, não cinza"></textarea>';
+      m.appendChild(fd); $("#eDet").value = it.det || "";
+
+      var r = el("div", "row");
+      var bs = el("button", "btn solid"); bs.innerHTML = svg(IC.check) + " Salvar";
+      bs.onclick = function () {
+        var e = {
+          nome: $("#eNome").value.trim() || it.nome,
+          cat: $("#eCat").value, sub: $("#eSub").value,
+          est: (atual.join("") || it.est), det: $("#eDet").value.trim()
+        };
+        S.edit[it.id] = e;
+        it.nome = e.nome; it.cat = e.cat; it.sub = e.sub; it.est = e.est; it.det = e.det;
+        save(); fechar(); railRender(); gridRender(); toast("Peça atualizada.");
+      };
+      r.appendChild(bs);
+      var bc = el("button", "btn ghost", "Cancelar");
+      bc.onclick = function () { fechar(); abrirPeca(it); };
+      r.appendChild(bc);
+      m.appendChild(r);
+
+      var p = el("p", "note"); p.style.marginTop = "14px";
+      p.innerHTML = "Os detalhes entram no pedido toda vez que você mandar tratar a foto ou gerar um look. " +
+        "Quanto mais específico o tecido e a cor, mais fiel a IA fica.";
+      m.appendChild(p);
+    });
+  }
+
   function abrirPeca(it) {
     abrirModal(function (m) {
       cabeca(m, it.nome, it.sub + (it.novo ? " · nova" : ""));
@@ -356,7 +444,8 @@
       [["Categoria", (CATS.filter(function (c) { return c.id === it.cat; })[0] || {}).nome || it.cat],
        ["Tipo", it.sub],
        ["Estações", it.est.split("").map(function (c) { return EST[c]; }).join(", ")],
-       ["Foto", it.pendente ? "sem tratamento" : "recorte pronto"]].forEach(function (p) {
+       ["Foto", it.pendente ? "sem tratamento" : "recorte pronto"]]
+       .concat(it.det ? [["Detalhes", it.det]] : []).forEach(function (p) {
         var d = el("div"); var k = el("span", "k", p[0]); var v = el("span", null, p[1]);
         d.appendChild(k); d.appendChild(v); f.appendChild(d);
       });
@@ -368,6 +457,9 @@
       var b2 = el("button", "btn"); b2.innerHTML = svg(IC.spark) + (it.pendente ? " Tratar foto" : " Refazer foto");
       b2.onclick = function () { tratarPeca(it, b2); };
       r.appendChild(b2);
+      var b3 = el("button", "btn ghost", "Editar");
+      b3.onclick = function () { fechar(); editarPeca(it); };
+      r.appendChild(b3);
       m.appendChild(r);
       var p = el("p", "note"); p.style.marginTop = "14px";
       p.innerHTML = temIA() ? "A IA devolve a peça em fundo branco e o site recorta sozinho." :
@@ -383,7 +475,7 @@
     loadImg(it.src).then(function (im) {
       var c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight;
       var x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0);
-      return gerar(PROMPT_PRODUTO, [c.toDataURL("image/jpeg", 0.92)]);
+      return gerar(promptProduto(it), [c.toDataURL("image/jpeg", 0.92)]);
     }).then(function (out) { return tirarFundoBranco(out); })
       .then(function (webp) {
         byId[it.id].src = webp; byId[it.id].pendente = false;
@@ -581,7 +673,7 @@
     btn.setAttribute("disabled", ""); btn.innerHTML = svg(IC.spark) + " Gerando…";
     montarFlatLay(o.itens).then(function (lay) {
       var imgs = CFG.prov === "grok" ? [lay] : [rostoRef(), lay];
-      return gerar(PROMPT_LOOK, imgs);
+      return gerar(promptLook(o.itens), imgs);
     }).then(function (out) {
       return loadImg(out).then(function (im) {
         var M = 900, s = Math.min(M / im.naturalWidth, M / im.naturalHeight);
@@ -674,7 +766,7 @@
       r.appendChild(bs);
       var be = el("button", "btn ghost"); be.innerHTML = svg(IC.down) + " Backup";
       be.onclick = function () {
-        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix }, null, 1)], { type: "application/json" });
+        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit }, null, 1)], { type: "application/json" });
         var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
         a.download = "guarda-roupa-backup.json"; a.click();
       };
@@ -686,7 +778,7 @@
         var f = e.target.files && e.target.files[0]; if (!f) return;
         f.text().then(function (t) {
           var d = JSON.parse(t);
-          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {};
+          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {}; S.edit = d.edit || {};
           save(); location.reload();
         }).catch(function () { toast("Arquivo inválido"); });
       };
@@ -718,6 +810,6 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") fechar(); });
 
   /* ---------------- boot ---------------- */
-  load(); railRender(); gridRender(); looksRender();
+  load(); aplicarEdicoes(); railRender(); gridRender(); looksRender();
   try { if (localStorage.getItem("gr_tab") === "looks") irPara("looks"); } catch (e) {}
 })();

@@ -231,3 +231,11 @@ button{background:none; border:0; cursor:pointer; padding:0}
 }
 .rail-sub .chip[aria-pressed="true"] { background: var(--mint); border-color: var(--mint); color: var(--ink); }
 .rail-sub .chip .n { opacity: .5; margin-left: 5px; }
+
+/* campo de texto longo na edição */
+.field textarea {
+  width: 100%; background: transparent; color: var(--ink);
+  border: 1px solid rgba(14,14,16,.16); padding: 10px 12px;
+  font: inherit; font-size: 14px; letter-spacing: -.01em; resize: vertical;
+}
+.field textarea:focus { outline: none; border-color: var(--ink); }

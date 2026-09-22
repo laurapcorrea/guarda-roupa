@@ -1,4 +1,4 @@
-// [arquivo, nome, categoria, subcategoria, estações(V O I P), novo?]
+// [arquivo, nome, categoria, subcategoria, estações(V O I P), novo?, detalhes pra IA]
 window.CATALOGO = [
 ["item_114","Blusa de girassóis","top","alça","V"],
 ["p085","Blusa de tule bordada preta","top","alça","VOP"],
@@ -52,7 +52,7 @@ window.CATALOGO = [
 ["p089","Blusa verde oliva bufante","top","manga longa","OP"],
 ["p051","Blusa vermelha drapeada","top","manga longa","VOP"],
 ["p086","Blusa vermelha sem manga","top","manga longa","VP"],
-["new_body_marrom","Body manga longa marrom","top","manga longa","OIP",1],
+["new_body_marrom","Body de tule marrom","top","manga longa","OIP",1,"tule transparente marrom, gola alta, manga longa, corpo de body cavado; o tecido tem que aparecer transparente, não pode virar malha opaca"],
 ["p136","Camisa bege de linho","top","manga longa","VP"],
 ["p047","Camisa branca manga 3/4","top","manga longa","VOP"],
 ["g035","Camisa camel oversized","top","manga longa","OP"],
@@ -62,10 +62,10 @@ window.CATALOGO = [
 ["p110","Camisa xadrez preto e branco","top","manga longa","OIP"],
 ["p050","Cropped branco manga bufante","top","manga longa","VOP"],
 ["p154","Gola alta caramelo sem manga","top","manga longa","OP"],
-["new_golaalta_chumbo","Gola alta chumbo","top","manga longa","OI",1],
-["new_golaalta_marrom","Gola alta marrom","top","manga longa","OI",1],
-["new_golaalta_nude","Gola alta nude","top","manga longa","OI",1],
-["new_golaalta_offwhite","Gola alta off-white","top","manga longa","OI",1],
+["new_golaalta_marrom","Gola alta marrom","top","manga longa","OI",1,"malha canelada marrom escuro, gola alta, manga longa, caimento justo"],
+["new_golaalta_nude","Gola alta nude","top","manga longa","OI",1,"malha lisa nude, gola alta, manga longa, caimento justo"],
+["new_golaalta_offwhite","Gola alta off-white","top","manga longa","OI",1,"malha canelada off-white, gola alta, manga longa, caimento justo"],
+["new_golaalta_chumbo","Gola alta preta","top","manga longa","OI",1,"canelada preta de verdade, não cinza nem chumbo; malha canelada fina, gola alta, manga longa, caimento justo"],
 ["p013","Gola alta preta canelada","top","manga longa","OI"],
 ["p000","Gola alta preta cropped","top","manga longa","OI"],
 ["p058","Suéter branco de tricô","top","manga longa","OI"],
