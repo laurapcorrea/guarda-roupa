@@ -39,7 +39,7 @@
     vestido: { l: 27, t: 5, w: 46 }, top: { l: 5, t: 8, w: 40 }, casaco: { l: 46, t: 3, w: 51 },
     bottom: { l: 8, t: 42, w: 43 }, calcado: { l: 58, t: 58, w: 29 }
   };
-  var ACC_POS = [{ l: 5, t: 76, w: 19 }, { l: 27, t: 79, w: 17 }, { l: 47, t: 82, w: 16 }, { l: 66, t: 84, w: 15 }];
+  // faixa de acessórios: linha limpa embaixo, distribuída conforme a quantidade
 
   var PROMPT_PRODUTO = "foto de produto desta peça de roupa, vestida em manequim invisível, esticada sem amassados, fundo branco puro, luz de estúdio suave, vista frontal centralizada, peça inteira visível, sem pessoa, sem sombra no chão";
   var PROMPT_LOOK = "a modelo da primeira imagem vestindo exatamente as peças da segunda imagem, mesma pose de pé de frente, corpo inteiro dos pés à cabeça, mesmo rosto e mesmo cabelo, fundo branco liso, luz de estúdio suave e uniforme, foto de catálogo realista, roupas caindo naturalmente no corpo, sem alterar o rosto, sem texto";
@@ -363,7 +363,7 @@
       m.appendChild(f);
       var r = el("div", "row");
       var b1 = el("button", "btn solid"); b1.innerHTML = svg(IC.check) + " Usar num look";
-      b1.onclick = function () { if (it.cat === "acessorio") { if (S.acc.indexOf(it.id) < 0) S.acc.push(it.id); } else { S.sel[it.cat] = it.id; } fechar(); abrirMontador(); };
+      b1.onclick = function () { if (it.cat === "acessorio" || it.cat === "joia" || it.cat === "chapeu") { if (S.acc.indexOf(it.id) < 0) S.acc.push(it.id); } else { S.sel[it.cat] = it.id; } fechar(); abrirMontador(); };
       r.appendChild(b1);
       var b2 = el("button", "btn"); b2.innerHTML = svg(IC.spark) + (it.pendente ? " Tratar foto" : " Refazer foto");
       b2.onclick = function () { tratarPeca(it, b2); };
@@ -403,11 +403,22 @@
       var p = LAY[role]; var im = el("img"); im.src = byId[id].src; im.alt = byId[id].nome;
       im.style.left = p.l + "%"; im.style.top = p.t + "%"; im.style.width = p.w + "%"; box.appendChild(im);
     });
-    (accs || []).slice(0, 4).forEach(function (id, k) {
-      if (!byId[id]) return; var p = ACC_POS[k];
-      var im = el("img"); im.src = byId[id].src; im.alt = byId[id].nome;
-      im.style.left = p.l + "%"; im.style.top = p.t + "%"; im.style.width = p.w + "%"; box.appendChild(im);
-    });
+    var lista = (accs || []).filter(function (id) { return byId[id]; }).slice(0, 6);
+    if (lista.length) {
+      var n = lista.length;
+      var w = n <= 2 ? 20 : n <= 4 ? 17 : 14;      // peça menor conforme enche a faixa
+      var gap = 3, total = n * w + (n - 1) * gap;
+      var x0 = (100 - total) / 2;
+      lista.forEach(function (id, k) {
+        var im = el("img"); im.src = byId[id].src; im.alt = byId[id].nome;
+        im.style.left = (x0 + k * (w + gap)) + "%";
+        im.style.top = "78%";
+        im.style.width = w + "%";
+        im.style.height = "20%";
+        im.style.objectFit = "contain";
+        box.appendChild(im);
+      });
+    }
     if (!Object.keys(sel).length && !(accs || []).length) box.appendChild(el("div", "ph", "escolha as peças"));
   }
 
@@ -416,7 +427,7 @@
       S.sel = {}; S.acc = [];
       (edit.itens || []).forEach(function (id) {
         var it = byId[id]; if (!it) return;
-        if (it.cat === "acessorio") S.acc.push(id); else S.sel[it.cat] = id;
+        if (it.cat === "acessorio" || it.cat === "joia" || it.cat === "chapeu") S.acc.push(id); else S.sel[it.cat] = id;
       });
     }
     abrirModal(function (m) {
@@ -467,9 +478,31 @@
   }
 
   function escolher(cat, cb, multi) {
-    var l = itens.filter(function (i) { return i.cat === cat; });
+    var grupos = cat === "acessorio" ? ["acessorio", "joia", "chapeu"] : [cat];
+    var l = itens.filter(function (i) { return grupos.indexOf(i.cat) >= 0; });
     abrirModal(function (m) {
-      cabeca(m, (CATS.filter(function (c) { return c.id === cat; })[0] || {}).nome || cat, l.length + " opções" + (multi ? " · pode escolher vários" : ""));
+      cabeca(m, cat === "acessorio" ? "Acessórios, joias e chapéus" : ((CATS.filter(function (c) { return c.id === cat; })[0] || {}).nome || cat), l.length + " opções" + (multi ? " · pode escolher vários" : ""));
+      if (multi) {
+        var fr = el("div", "rail rail-sub"); fr.style.marginBottom = "10px";
+        var atual = { v: "todas" };
+        function pinta() {
+          [].slice.call(fr.children).forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.k === atual.v)); });
+          [].slice.call(m.querySelectorAll(".grid > *")).forEach(function (n, k) {
+            n.style.display = (atual.v === "todas" || l[k].sub === atual.v || l[k].cat === atual.v) ? "" : "none";
+          });
+        }
+        [["todas", "Tudo"], ["bolsa", "Bolsas"], ["cinto", "Cintos"], ["óculos", "Óculos"],
+         ["lenço", "Lenços"], ["joia", "Joias"], ["chapeu", "Chapéus"]].forEach(function (e) {
+          var n = e[0] === "todas" ? l.length : l.filter(function (i) { return i.sub === e[0] || i.cat === e[0]; }).length;
+          if (!n) return;
+          var b = el("button", "chip sub"); b.innerHTML = e[1] + '<span class="n">' + n + "</span>";
+          b.dataset.k = e[0];
+          b.onclick = function () { atual.v = e[0]; pinta(); };
+          fr.appendChild(b);
+        });
+        m.appendChild(fr);
+        setTimeout(pinta, 0);
+      }
       var g = el("div", "grid");
       l.forEach(function (i) {
         g.appendChild(tile(i, function () {
@@ -520,7 +553,7 @@
     var c = el("div", "ocard");
     var box = el("div", "flat");
     var sel = {}, accs = [];
-    (o.itens || []).forEach(function (id) { var it = byId[id]; if (!it) return; if (it.cat === "acessorio") accs.push(id); else sel[it.cat] = id; });
+    (o.itens || []).forEach(function (id) { var it = byId[id]; if (!it) return; if (it.cat === "acessorio" || it.cat === "joia" || it.cat === "chapeu") accs.push(id); else sel[it.cat] = id; });
     flatLay(box, sel, accs, o.lookUrl);
     c.appendChild(box);
     var b = el("div", "obody");
