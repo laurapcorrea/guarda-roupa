@@ -161,6 +161,7 @@ window.CATALOGO = [
 ["p148","Casaco camel longo","casaco","sobretudo","OI"],
 ["p153","Casaco camel trespassado","casaco","sobretudo","I"],
 ["p079","Bota branca de neve","calcado","bota","I"],
+["new_bota_marrom_curta","Bota marrom de cano curto","calcado","bota","OIP",2,"bota de cano curto até o tornozelo, couro marrom escuro, bico fino, salto alto fino, zíper lateral"],
 ["p034","Bota preta cano alto","calcado","bota","OI"],
 ["p041","Coturno preto","calcado","bota","OI"],
 ["p038","Coturno preto anabela","calcado","bota","OI"],
