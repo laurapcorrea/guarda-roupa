@@ -225,12 +225,26 @@ window.CATALOGO = [
 
 // looks já gerados no avatar: chave = ids das peças em ordem alfabética
 window.LOOKS_PRONTOS = {
-  "new_jaqueta_couro_marrom,new_oculos_gatinho_preto,p024,p058,p061": "img/look_trico_couro_preta.webp",
-  "p013,p034,p194,p197": "img/look_golaalta_animalprint.webp",
-  "new_oculos_gatinho_preto,p010,p013,p038,p153": "img/look_casaco_camel_preto.webp",
-  "new_golaalta_offwhite,new_oculos_gatinho_preto,p061,p111,p148": "img/look_casaco_camel_bege.webp",
-  "g037,p013,p024,p034": "img/look_blazer_caqui_preto.webp",
-  "new_golaalta_marrom,new_jaqueta_couro_marrom,p061,p114": "img/look_golaalta_marrom_couro.webp",
-  "new_jaqueta_couro_marrom,new_oculos_redondo_dourado,p058,p061,p111,p149,p194": "img/look_trico_couro_camel.webp",
-  "new_oculos_redondo_dourado,new_trico_golav_preto,p047,p078,p104": "img/look_camisa_trico_jeans.webp",
+  "new_jaqueta_couro_marrom,new_oculos_gatinho_preto,p024,p058,p061": "img/looks/look_trico_couro_preta.webp",
+  "p013,p034,p194,p197": "img/looks/look_golaalta_animalprint.webp",
+  "new_oculos_gatinho_preto,p010,p013,p038,p153": "img/looks/look_casaco_camel_preto.webp",
+  "new_golaalta_offwhite,new_oculos_gatinho_preto,p061,p111,p148": "img/looks/look_casaco_camel_bege.webp",
+  "g037,p013,p024,p034": "img/looks/look_blazer_caqui_preto.webp",
+  "new_golaalta_marrom,new_jaqueta_couro_marrom,p061,p114": "img/looks/look_golaalta_marrom_couro.webp",
+  "new_jaqueta_couro_marrom,new_oculos_redondo_dourado,p058,p061,p111,p149,p194": "img/looks/look_trico_couro_camel.webp",
+  "new_oculos_redondo_dourado,new_trico_golav_preto,p047,p078,p104": "img/looks/look_camisa_trico_jeans.webp",
+  "new_bota_marrom_curta,new_golaalta_marrom,new_jaqueta_couro_marrom,new_oculos_redondo_dourado,p114,p194": "img/looks/look_outono1_bota_marrom.webp",
 };
+
+// looks embutidos: vem do site, aparecem em qualquer aparelho
+window.LOOKS_SEED = [
+  {"id": "seed_trico_couro_preta", "nome": "Tricô branco, couro marrom e calça preta", "est": "O", "itens": ["p058", "new_jaqueta_couro_marrom", "p024", "p061", "new_oculos_gatinho_preto"]},
+  {"id": "seed_golaalta_animalprint", "nome": "Gola alta preta com saia animal print", "est": "I", "itens": ["p013", "p197", "p034", "p194"]},
+  {"id": "seed_casaco_camel_preto", "nome": "Casaco camel com preto", "est": "O", "itens": ["p013", "p153", "p010", "p038", "new_oculos_gatinho_preto"]},
+  {"id": "seed_casaco_camel_bege", "nome": "Casaco camel com bege", "est": "O", "itens": ["new_golaalta_offwhite", "p148", "p111", "p061", "new_oculos_gatinho_preto"]},
+  {"id": "seed_blazer_caqui_preto", "nome": "Blazer caqui com preto", "est": "O", "itens": ["p013", "g037", "p024", "p034"]},
+  {"id": "seed_golaalta_marrom_couro", "nome": "Gola alta marrom com couro", "est": "O", "itens": ["new_golaalta_marrom", "new_jaqueta_couro_marrom", "p114", "p061"]},
+  {"id": "seed_trico_couro_camel", "nome": "Tricô branco, couro e calça camel", "est": "I", "itens": ["p058", "new_jaqueta_couro_marrom", "p111", "p061", "p149", "new_oculos_redondo_dourado", "p194"]},
+  {"id": "seed_camisa_trico_jeans", "nome": "Camisa branca, tricô preto e jeans", "est": "I", "itens": ["p047", "new_trico_golav_preto", "p104", "p078", "new_oculos_redondo_dourado"]},
+  {"id": "seed_outono1_bota_marrom", "nome": "Outono 1", "est": "O", "itens": ["new_golaalta_marrom", "new_jaqueta_couro_marrom", "p114", "new_bota_marrom_curta", "new_oculos_redondo_dourado", "p194"]},
+];

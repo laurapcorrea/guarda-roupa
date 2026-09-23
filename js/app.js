@@ -73,22 +73,141 @@
     });
   }
 
-  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {}, edit: {}, del: {}, vis: {} };
-  var CFG = { prov: "puter", gkey: "", xkey: "", rosto: "" };
+  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {}, edit: {}, del: {}, vis: {}, semOff: [], quando: 0 };
+  var CFG = { prov: "puter", gkey: "", xkey: "", rosto: "", gh: "" };
   function rostoRef() { return CFG.rosto || window.AVATAR_PADRAO || ""; }
 
-  function load() {
-    try {
-      var a = JSON.parse(localStorage.getItem("gr_state") || "{}");
-      S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {}; S.edit = a.edit || {}; S.del = a.del || {}; S.vis = a.vis || {};
-    } catch (e) {}
-    try { CFG = Object.assign(CFG, JSON.parse(localStorage.getItem("gr_cfg") || "{}")); } catch (e) {}
-    S.extra.forEach(function (it) { if (!byId[it.id]) { itens.push(it); byId[it.id] = it; } });
-    Object.keys(S.fix).forEach(function (id) { if (byId[id]) { byId[id].src = S.fix[id]; byId[id].pendente = false; } });
+  /* ---------------- armazenamento ----------------
+     Antes tudo ia pro localStorage, que estoura em ~5 MB por causa das fotos
+     em base64: o save falhava calado e as edições voltavam no refresh.
+     Agora: IndexedDB neste aparelho (sem limite apertado) + estado.json no
+     GitHub, que é o que faz o guarda-roupa existir em qualquer navegador. */
+  var REPO = { dono: "laurapcorrea", nome: "guarda-roupa", arq: "estado.json", ramo: "main" };
+  var _db = null;
+  function db() {
+    if (_db) return _db;
+    _db = new Promise(function (res, rej) {
+      var r = indexedDB.open("guarda_roupa", 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore("kv"); };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    });
+    return _db;
   }
+  function dbGet(k) {
+    return db().then(function (d) {
+      return new Promise(function (res, rej) {
+        var q = d.transaction("kv", "readonly").objectStore("kv").get(k);
+        q.onsuccess = function () { res(q.result); }; q.onerror = function () { rej(q.error); };
+      });
+    });
+  }
+  function dbSet(k, v) {
+    return db().then(function (d) {
+      return new Promise(function (res, rej) {
+        var q = d.transaction("kv", "readwrite").objectStore("kv").put(v, k);
+        q.onsuccess = function () { res(); }; q.onerror = function () { rej(q.error); };
+      });
+    });
+  }
+
+  function estadoAtual() {
+    return { outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit,
+             del: S.del, vis: S.vis, semOff: S.semOff, atualizadoEm: S.quando || 0 };
+  }
+  function aplicarEstado(a) {
+    if (!a) return;
+    S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {};
+    S.edit = a.edit || {}; S.del = a.del || {}; S.vis = a.vis || {};
+    S.semOff = a.semOff || []; S.quando = a.atualizadoEm || 0;
+  }
+
+  // lê o estado publicado, sem precisar de token
+  function lerRemoto() {
+    var u = "https://raw.githubusercontent.com/" + REPO.dono + "/" + REPO.nome + "/" + REPO.ramo + "/" + REPO.arq + "?t=" + Date.now();
+    return fetch(u).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+
+  function load() {
+    try { CFG = Object.assign(CFG, JSON.parse(localStorage.getItem("gr_cfg") || "{}")); } catch (e) {}
+    var antigo = null;
+    try { antigo = JSON.parse(localStorage.getItem("gr_state") || "null"); } catch (e) {}
+    return Promise.all([
+      dbGet("estado").catch(function () { return null; }),
+      lerRemoto()
+    ]).then(function (r) {
+      var local = r[0] || antigo, remoto = r[1];
+      // o mais novo ganha; o que nunca foi sincronizado conta como 0
+      var tl = (local && local.atualizadoEm) || 0, tr = (remoto && remoto.atualizadoEm) || 0;
+      var esc = local && (!remoto || tl >= tr) ? local : (remoto || local);
+      aplicarEstado(esc);
+      if (local && !r[0]) dbSet("estado", local).catch(function () {});   // migra do localStorage
+      juntarSementes();
+      S.extra.forEach(function (it) { if (!byId[it.id]) { itens.push(it); byId[it.id] = it; } });
+      Object.keys(S.fix).forEach(function (id) { if (byId[id]) { byId[id].src = S.fix[id]; byId[id].pendente = false; } });
+    });
+  }
+
+  /* Looks que vêm no próprio site, com a foto no avatar já pronta.
+     Repostos a pedido dela, porque os que ela montou se perderam.
+     Não entra duplicado (compara as peças), e se ela apagar um, o id fica
+     em semOff e ele não volta mais, em nenhum aparelho. */
+  function juntarSementes() {
+    var SD = window.LOOKS_SEED; if (!SD || !SD.length) return;
+    var porId = {}, porPecas = {};
+    S.outfits.forEach(function (o) {
+      porId[o.id] = 1;
+      porPecas[(o.itens || []).slice().sort().join(",")] = 1;
+    });
+    SD.forEach(function (sd) {
+      if (porId[sd.id]) return;
+      if (S.semOff.indexOf(sd.id) >= 0) return;
+      if (porPecas[(sd.itens || []).slice().sort().join(",")]) return;
+      S.outfits.push({ id: sd.id, nome: sd.nome, est: sd.est, itens: (sd.itens || []).slice(), lookUrl: "" });
+    });
+  }
+
+  var _tSync = null;
   function save() {
-    try { localStorage.setItem("gr_state", JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del, vis: S.vis })); }
-    catch (e) { toast("Memória do navegador cheia. Exporte o backup."); }
+    S.quando = Date.now();
+    var e = estadoAtual();
+    dbSet("estado", e).catch(function () { toast("Não consegui salvar neste aparelho."); });
+    if (!CFG.gh) return;
+    clearTimeout(_tSync);
+    _tSync = setTimeout(function () { enviarRemoto(e); }, 1800);
+  }
+
+  function b64(txt) { return btoa(unescape(encodeURIComponent(txt))); }
+  var _enviando = false;
+  function enviarRemoto(e) {
+    if (!CFG.gh || _enviando) return;
+    _enviando = true;
+    marcarSync("salvando");
+    var base = "https://api.github.com/repos/" + REPO.dono + "/" + REPO.nome + "/contents/" + REPO.arq;
+    var h = { Authorization: "Bearer " + CFG.gh, Accept: "application/vnd.github+json" };
+    fetch(base + "?ref=" + REPO.ramo, { headers: h })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (meta) {
+        return fetch(base, {
+          method: "PUT", headers: h,
+          body: JSON.stringify({
+            message: "estado do guarda-roupa", branch: REPO.ramo,
+            content: b64(JSON.stringify(e)), sha: meta && meta.sha ? meta.sha : undefined
+          })
+        });
+      })
+      .then(function (r) {
+        _enviando = false;
+        if (r && r.ok) marcarSync("ok");
+        else { marcarSync("erro"); r.json().then(function (j) { toast("Sync falhou: " + ((j && j.message) || r.status)); }); }
+      })
+      .catch(function (err) { _enviando = false; marcarSync("erro"); toast("Sync falhou: " + err.message); });
+  }
+  function marcarSync(e) {
+    var n = document.getElementById("sync"); if (!n) return;
+    n.className = "sync " + e;
+    n.textContent = e === "salvando" ? "salvando…" : e === "ok" ? "salvo no GitHub" : e === "erro" ? "não salvou" : "";
+    if (e === "ok") setTimeout(function () { if (n.className === "sync ok") n.textContent = ""; }, 2600);
   }
   function saveCfg() { try { localStorage.setItem("gr_cfg", JSON.stringify(CFG)); } catch (e) {} }
 
@@ -785,7 +904,9 @@
     var b3 = el("button", "btn sm ghost"); b3.innerHTML = svg(IC.trash); b3.setAttribute("aria-label", "Apagar");
     b3.onclick = function () {
       S.outfits = S.outfits.filter(function (x) { return x.id !== o.id; });
-      delete S.vis[o.id]; save(); looksRender(); toast("Look apagado");
+      delete S.vis[o.id];
+      if (o.id.indexOf("seed_") === 0 && S.semOff.indexOf(o.id) < 0) S.semOff.push(o.id);
+      save(); looksRender(); toast("Look apagado");
     };
     r.appendChild(b3); b.appendChild(r); c.appendChild(b);
     return c;
@@ -892,6 +1013,18 @@
       m.appendChild(f2);
       $("#cProv").value = CFG.prov; $("#cG").value = CFG.gkey || ""; $("#cX").value = CFG.xkey || "";
 
+      var fs = el("label", "field");
+      fs.innerHTML = '<span class="k">Token do GitHub · sincroniza os looks entre aparelhos</span>' +
+        '<input id="cGH" type="password" placeholder="github_pat_..." autocomplete="off">' +
+        '<span class="dica">Fine-grained, só o repositório guarda-roupa, permissão Contents: read and write. ' +
+        'Sem ele os looks ficam só neste navegador.</span>';
+      m.appendChild(fs);
+      $("#cGH").value = CFG.gh || "";
+      var lsync = el("div", "field");
+      lsync.innerHTML = '<span class="dica" id="estSync">' +
+        (CFG.gh ? "sincronizando com o GitHub" : "sem sincronização: os looks somem se você resetar o navegador") + '</span>';
+      m.appendChild(lsync);
+
       var lab = el("div", "field"); lab.innerHTML = '<span class="k">Avatar usado para vestir os looks</span>'; m.appendChild(lab);
       var prev = el("div"); prev.style.cssText = "display:flex;gap:10px;align-items:center;margin-bottom:14px";
       var im = el("img"); im.src = rostoRef(); im.style.cssText = "width:78px;height:98px;object-fit:cover"; prev.appendChild(im);
@@ -908,16 +1041,29 @@
       var bs = el("button", "btn solid"); bs.innerHTML = svg(IC.check) + " Salvar";
       bs.onclick = function () {
         CFG.prov = $("#cProv").value; CFG.gkey = $("#cG").value.trim(); CFG.xkey = $("#cX").value.trim();
-        saveCfg(); fechar(); looksRender(); toast("Configuração salva.");
+        var antes = CFG.gh; CFG.gh = $("#cGH").value.trim();
+        saveCfg(); fechar(); looksRender();
+        if (CFG.gh && CFG.gh !== antes) { S.quando = Date.now(); enviarRemoto(estadoAtual()); toast("Sincronização ligada. Mandando pro GitHub…"); }
+        else toast("Configuração salva.");
       };
       r.appendChild(bs);
       var be = el("button", "btn ghost"); be.innerHTML = svg(IC.down) + " Backup";
       be.onclick = function () {
-        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del, vis: S.vis }, null, 1)], { type: "application/json" });
+        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del, vis: S.vis, semOff: S.semOff }, null, 1)], { type: "application/json" });
         var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
         a.download = "guarda-roupa-backup.json"; a.click();
       };
       r.appendChild(be);
+      var bp = el("button", "btn ghost", "Puxar do GitHub");
+      bp.onclick = function () {
+        lerRemoto().then(function (d) {
+          if (!d) { toast("Não achei estado.json no repositório ainda."); return; }
+          aplicarEstado(d); save(); fechar();
+          aplicarEdicoes(); railRender(); gridRender(); looksRender();
+          toast("Estado do GitHub carregado.");
+        });
+      };
+      r.appendChild(bp);
       var bi = el("button", "btn ghost", "Restaurar");
       var fj = el("input"); fj.type = "file"; fj.accept = "application/json"; fj.style.display = "none";
       bi.onclick = function () { fj.click(); };
@@ -925,7 +1071,7 @@
         var f = e.target.files && e.target.files[0]; if (!f) return;
         f.text().then(function (t) {
           var d = JSON.parse(t);
-          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {}; S.edit = d.edit || {}; S.del = d.del || {}; S.vis = d.vis || {};
+          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {}; S.edit = d.edit || {}; S.del = d.del || {}; S.vis = d.vis || {}; S.semOff = d.semOff || [];
           save(); location.reload();
         }).catch(function () { toast("Arquivo inválido"); });
       };
@@ -957,6 +1103,8 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") fechar(); });
 
   /* ---------------- boot ---------------- */
-  load(); aplicarEdicoes(); railRender(); gridRender(); looksRender();
-  try { if (localStorage.getItem("gr_tab") === "looks") irPara("looks"); } catch (e) {}
+  load().then(function () {
+    aplicarEdicoes(); railRender(); gridRender(); looksRender();
+    try { if (localStorage.getItem("gr_tab") === "looks") irPara("looks"); } catch (e) {}
+  });
 })();
