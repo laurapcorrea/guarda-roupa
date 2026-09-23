@@ -100,6 +100,7 @@ window.CATALOGO = [
 ["p024","Calça preta social","bottom","calça","VOIP"],
 ["p082","Calça verde militar","bottom","calça","OIP"],
 ["p173","Calça verde militar","bottom","calça","OIP"],
+["new_legging_preta","Legging preta","bottom","calça","OIP",2,"legging preta básica, justa, cintura alta, até o tornozelo, malha lisa fosca sem brilho"],
 ["p052","Saia branca com cinto","bottom","saia","VP"],
 ["p057","Saia longa branca de tule","bottom","saia","VP"],
 ["p197","Saia midi animal print","bottom","saia","VOP"],

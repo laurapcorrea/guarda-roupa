@@ -556,8 +556,10 @@
     if (!Object.keys(sel).length && !(accs || []).length) box.appendChild(el("div", "ph", "escolha as peças"));
   }
 
-  function abrirMontador(edit) {
-    if (edit) {
+  // carregado: true quando S.sel/S.acc já refletem o que está na tela.
+  // sem isso, cada redraw recarregava o look salvo e desfazia a troca que ela acabou de fazer.
+  function abrirMontador(edit, carregado) {
+    if (edit && !carregado) {
       S.sel = {}; S.acc = [];
       (edit.itens || []).forEach(function (id) {
         var it = byId[id]; if (!it) return;
@@ -577,7 +579,7 @@
           b.appendChild(x);
         } else { b.appendChild(el("span", "plus", "+")); }
         b.appendChild(el("span", "k", s.label));
-        b.onclick = function () { escolher(s.cat, function (pid) { S.sel[s.role] = pid; redraw(); }, false, function () { abrirMontador(edit); }); };
+        b.onclick = function () { escolher(s.cat, function (pid) { S.sel[s.role] = pid; redraw(); }, false, function () { abrirMontador(edit, true); }); };
         sl.appendChild(b);
       });
       m.appendChild(sl);
@@ -591,7 +593,7 @@
         strip.appendChild(a);
       });
       var add = el("button", "add", "+");
-      add.onclick = function () { escolher("acessorio", function (pid) { if (S.acc.indexOf(pid) < 0) S.acc.push(pid); redraw(); }, true, function () { abrirMontador(edit); }); };
+      add.onclick = function () { escolher("acessorio", function (pid) { if (S.acc.indexOf(pid) < 0) S.acc.push(pid); redraw(); }, true, function () { abrirMontador(edit, true); }); };
       strip.appendChild(add); m.appendChild(strip);
 
       var two = el("div", "two");
@@ -607,7 +609,7 @@
       m.appendChild(r);
 
       flatLay(box, S.sel, S.acc);
-      function redraw() { fechar(); abrirMontador(edit); }
+      function redraw() { fechar(); abrirMontador(edit, true); }
     });
   }
 
@@ -670,7 +672,7 @@
       if (multi) {
         var r = el("div", "row"); r.style.marginTop = "16px";
         var b = el("button", "btn mint"); b.innerHTML = svg(IC.check) + " Pronto";
-        b.onclick = function () { fechar(); abrirMontador(); }; r.appendChild(b); m.appendChild(r);
+        b.onclick = function () { fechar(); if (voltar) voltar(); else abrirMontador(null, true); }; r.appendChild(b); m.appendChild(r);
       }
     }, voltar);
   }
@@ -696,7 +698,8 @@
     var o = {
       id: edit ? edit.id : uid(), nome: (nome.trim() || EST[est] + " " + (S.outfits.length + 1)),
       est: est, itens: ids, criadoEm: new Date().toISOString(),
-      lookUrl: edit ? edit.lookUrl || "" : ""
+      // se as peças mudaram, a imagem gerada antes não vale mais
+      lookUrl: (edit && (edit.itens || []).slice().sort().join(",") === ids.slice().sort().join(",")) ? (edit.lookUrl || "") : ""
     };
     var i = -1; S.outfits.forEach(function (x, k) { if (x.id === o.id) i = k; });
     if (i >= 0) S.outfits[i] = o; else S.outfits.unshift(o);
