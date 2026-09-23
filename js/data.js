@@ -208,6 +208,7 @@ window.CATALOGO = [
 ["p194","Colar dourado com medalha","joia","colar","VOIP"],
 ["p209","Colar dourado duplo fino","joia","colar","VOIP"],
 ["p183","Colar dourado três fios","joia","colar","VOIP"],
+["new_relogio_dourado","Relógio dourado e prata","joia","relógio","VOIP",2,"relógio de pulso com caixa quadrada, mostrador branco com números romanos, pulseira de elos em dois tons, dourado e prata"],
 ["new_bone_ny","Boné bege NEW YORK","chapeu","boné","VOIP",2,"boné aba curva bege cru com bordado preto em duas linhas NEW YORK e N.Y."],
 ["new_bone_roxo","Boné roxo too busy making money","chapeu","boné","VOIP",2,"boné aba curva roxo magenta com bordado branco em duas linhas, too busy making money, fonte serifada minúscula"],
 ["p003","Gorro preto","chapeu","gorro","I"]
