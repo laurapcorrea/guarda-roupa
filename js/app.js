@@ -177,7 +177,8 @@
     _tSync = setTimeout(function () { enviarRemoto(e); }, 1800);
   }
 
-  function b64(txt) { return btoa(unescape(encodeURIComponent(txt))); }
+  // nome próprio: já existe um b64() mais abaixo, pra data URL de imagem, que sobrescrevia este
+  function paraBase64(txt) { return btoa(unescape(encodeURIComponent(txt))); }
   var _enviando = false, _pendente = null;
   function enviarRemoto(e) {
     if (!CFG.gh) return;
@@ -197,7 +198,7 @@
           method: "PUT", headers: h,
           body: JSON.stringify({
             message: "estado do guarda-roupa", branch: REPO.ramo,
-            content: b64(JSON.stringify(e)), sha: meta && meta.sha ? meta.sha : undefined
+            content: paraBase64(JSON.stringify(e)), sha: meta && meta.sha ? meta.sha : undefined
           })
         });
       })
