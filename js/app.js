@@ -178,14 +178,19 @@
   }
 
   function b64(txt) { return btoa(unescape(encodeURIComponent(txt))); }
-  var _enviando = false;
+  var _enviando = false, _pendente = null;
   function enviarRemoto(e) {
-    if (!CFG.gh || _enviando) return;
-    _enviando = true;
-    marcarSync("salvando");
+    if (!CFG.gh) return;
+    if (_enviando) { _pendente = e; return; }   // não perde a mudança que chegou no meio do envio
+    _enviando = true; marcarSync("salvando");
+    tentarEnviar(e, 0);
+  }
+  // O GET do GitHub às vezes devolve um sha em cache logo depois de uma gravação,
+  // e aí o PUT volta 409 "does not match". Relê sem cache e tenta de novo.
+  function tentarEnviar(e, n) {
     var base = "https://api.github.com/repos/" + REPO.dono + "/" + REPO.nome + "/contents/" + REPO.arq;
     var h = { Authorization: "Bearer " + CFG.gh, Accept: "application/vnd.github+json" };
-    fetch(base + "?ref=" + REPO.ramo, { headers: h })
+    fetch(base + "?ref=" + REPO.ramo + "&t=" + Date.now(), { headers: h, cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (meta) {
         return fetch(base, {
@@ -197,11 +202,20 @@
         });
       })
       .then(function (r) {
-        _enviando = false;
-        if (r && r.ok) marcarSync("ok");
-        else { marcarSync("erro"); r.json().then(function (j) { toast("Sync falhou: " + ((j && j.message) || r.status)); }); }
+        if (r.ok) { terminouSync(true); return; }
+        if ((r.status === 409 || r.status === 422) && n < 4) {
+          setTimeout(function () { tentarEnviar(e, n + 1); }, 600 * (n + 1));
+          return;
+        }
+        r.json().then(function (j) { toast("Sync falhou: " + ((j && j.message) || r.status)); }).catch(function () {});
+        terminouSync(false);
       })
-      .catch(function (err) { _enviando = false; marcarSync("erro"); toast("Sync falhou: " + err.message); });
+      .catch(function (err) { toast("Sync falhou: " + err.message); terminouSync(false); });
+  }
+  function terminouSync(ok) {
+    _enviando = false;
+    marcarSync(ok ? "ok" : "erro");
+    if (_pendente) { var q = _pendente; _pendente = null; enviarRemoto(q); }
   }
   function marcarSync(e) {
     var n = document.getElementById("sync"); if (!n) return;
@@ -744,6 +758,50 @@
     calcado: function (i) { return false; }
   };
 
+  /* Chips de sub-filtro dentro do montador, iguais aos da aba Peças.
+     A chave é a subcategoria quando a peça é da própria caixa, e "cat:<categoria>"
+     quando ela veio de fora (vestido aparecendo em Cima, blusa de manga longa em Casacos). */
+  function railSub(m, l, cat, grupos) {
+    function chaveDe(i) { return grupos.indexOf(i.cat) >= 0 ? (i.sub || "outros") : "cat:" + i.cat; }
+    var ordem = (SUBS[cat] || []).slice();
+    var chaves = [], visto = {};
+    l.forEach(function (i) { var k = chaveDe(i); if (!visto[k]) { visto[k] = 1; chaves.push(k); } });
+    chaves.sort(function (a, b) {
+      var ia = ordem.indexOf(a), ib = ordem.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    if (chaves.length < 2) return function () {};
+    // peças que vieram de outra categoria pra ajudar (blusa de manga longa em Casacos, vestido em Cima)
+    var DE_FORA = { top: "Blusas", vestido: "Vestidos", casaco: "Casacos", bottom: "Baixo" };
+    function rotulo(k) {
+      if (k.indexOf("cat:") === 0) {
+        var id = k.slice(4);
+        if (DE_FORA[id]) return DE_FORA[id];
+        var c = CATS.filter(function (x) { return x.id === id; })[0];
+        return c ? c.nome : id;
+      }
+      return k.charAt(0).toUpperCase() + k.slice(1);
+    }
+    var fr = el("div", "rail rail-sub"); fr.style.marginBottom = "10px";
+    var atual = { v: "todas" };
+    function pinta() {
+      [].slice.call(fr.children).forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.k === atual.v)); });
+      [].slice.call(m.querySelectorAll(".grid > *")).forEach(function (n, k) {
+        n.style.display = (atual.v === "todas" || chaveDe(l[k]) === atual.v) ? "" : "none";
+      });
+    }
+    [["todas", "Tudo"]].concat(chaves.map(function (k) { return [k, rotulo(k)]; })).forEach(function (e) {
+      var n = e[0] === "todas" ? l.length : l.filter(function (i) { return chaveDe(i) === e[0]; }).length;
+      if (!n) return;
+      var b = el("button", "chip sub"); b.innerHTML = e[1] + '<span class="n">' + n + "</span>";
+      b.dataset.k = e[0];
+      b.onclick = function () { atual.v = e[0]; pinta(); };
+      fr.appendChild(b);
+    });
+    m.appendChild(fr);
+    return pinta;
+  }
+
   function escolher(cat, cb, multi, voltar) {
     var grupos = cat === "acessorio" ? ["acessorio", "joia", "chapeu"] : [cat];
     var base = itens.filter(function (i) { return grupos.indexOf(i.cat) >= 0; });
@@ -762,27 +820,7 @@
         rv.appendChild(bt);
         m.appendChild(rv);
       }
-      if (multi) {
-        var fr = el("div", "rail rail-sub"); fr.style.marginBottom = "10px";
-        var atual = { v: "todas" };
-        function pinta() {
-          [].slice.call(fr.children).forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.k === atual.v)); });
-          [].slice.call(m.querySelectorAll(".grid > *")).forEach(function (n, k) {
-            n.style.display = (atual.v === "todas" || l[k].sub === atual.v || l[k].cat === atual.v) ? "" : "none";
-          });
-        }
-        [["todas", "Tudo"], ["bolsa", "Bolsas"], ["cinto", "Cintos"], ["óculos", "Óculos"],
-         ["lenço", "Lenços"], ["joia", "Joias"], ["chapeu", "Chapéus"]].forEach(function (e) {
-          var n = e[0] === "todas" ? l.length : l.filter(function (i) { return i.sub === e[0] || i.cat === e[0]; }).length;
-          if (!n) return;
-          var b = el("button", "chip sub"); b.innerHTML = e[1] + '<span class="n">' + n + "</span>";
-          b.dataset.k = e[0];
-          b.onclick = function () { atual.v = e[0]; pinta(); };
-          fr.appendChild(b);
-        });
-        m.appendChild(fr);
-        setTimeout(pinta, 0);
-      }
+      var pinta = railSub(m, l, cat, grupos);
       var g = el("div", "grid");
       l.forEach(function (i) {
         g.appendChild(tile(i, function () {
@@ -791,6 +829,7 @@
         }, multi && S.acc.indexOf(i.id) >= 0));
       });
       m.appendChild(g);
+      pinta();
       if (multi) {
         var r = el("div", "row"); r.style.marginTop = "16px";
         var b = el("button", "btn mint"); b.innerHTML = svg(IC.check) + " Pronto";
@@ -807,9 +846,12 @@
       var bv = el("button", "btn ghost sm", "Voltar");
       bv.onclick = function () { fechar(); escolher(cat, cb, false, voltar); };
       rv.appendChild(bv); m.appendChild(rv);
+      var todos = itens.slice();
+      var pinta = railSub(m, todos, null, []);
       var g = el("div", "grid");
-      itens.forEach(function (i) { g.appendChild(tile(i, function () { cb(i.id); })); });
+      todos.forEach(function (i) { g.appendChild(tile(i, function () { cb(i.id); })); });
       m.appendChild(g);
+      pinta();
     }, voltar);
   }
 
