@@ -73,21 +73,21 @@
     });
   }
 
-  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {}, edit: {}, del: {} };
+  var S = { tab: "pecas", cat: "todas", sub: "todas", est: "todas", q: "", sel: {}, acc: [], outfits: [], extra: [], fix: {}, edit: {}, del: {}, vis: {} };
   var CFG = { prov: "puter", gkey: "", xkey: "", rosto: "" };
   function rostoRef() { return CFG.rosto || window.AVATAR_PADRAO || ""; }
 
   function load() {
     try {
       var a = JSON.parse(localStorage.getItem("gr_state") || "{}");
-      S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {}; S.edit = a.edit || {}; S.del = a.del || {};
+      S.outfits = a.outfits || []; S.extra = a.extra || []; S.fix = a.fix || {}; S.edit = a.edit || {}; S.del = a.del || {}; S.vis = a.vis || {};
     } catch (e) {}
     try { CFG = Object.assign(CFG, JSON.parse(localStorage.getItem("gr_cfg") || "{}")); } catch (e) {}
     S.extra.forEach(function (it) { if (!byId[it.id]) { itens.push(it); byId[it.id] = it; } });
     Object.keys(S.fix).forEach(function (id) { if (byId[id]) { byId[id].src = S.fix[id]; byId[id].pendente = false; } });
   }
   function save() {
-    try { localStorage.setItem("gr_state", JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del })); }
+    try { localStorage.setItem("gr_state", JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del, vis: S.vis })); }
     catch (e) { toast("Memória do navegador cheia. Exporte o backup."); }
   }
   function saveCfg() { try { localStorage.setItem("gr_cfg", JSON.stringify(CFG)); } catch (e) {} }
@@ -99,7 +99,8 @@
   var IC = {
     spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.8 2.8M14.9 14.9l2.8 2.8M17.7 6.3l-2.8 2.8M9.1 14.9l-2.8 2.8"/>',
     check: '<path d="m5 13 4 4L19 7"/>', trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>', down: '<path d="M12 4v12M7 12l5 5 5-5M5 20h14"/>'
+    plus: '<path d="M12 5v14M5 12h14"/>', down: '<path d="M12 4v12M7 12l5 5 5-5M5 20h14"/>',
+    copy: '<path d="M9 9h10v10H9zM5 15V5h10"/>'
   };
   function toast(m) {
     var o = document.querySelector(".toast"); if (o) o.remove();
@@ -529,9 +530,11 @@
   }
 
   /* ---------------- montador ---------------- */
-  function flatLay(box, sel, accs, lookUrl) {
+  function flatLay(box, sel, accs, lookUrl, modo) {
     box.innerHTML = "";
-    if (lookUrl) { var lk = el("img", "look"); lk.src = lookUrl; lk.alt = "look gerado"; box.appendChild(lk); return; }
+    // modo "avatar" mostra a foto gerada, "moodboard" mostra as peças soltas.
+    // sem modo (montador) o comportamento antigo vale: foto quando existe.
+    if (lookUrl && modo !== "moodboard") { var lk = el("img", "look"); lk.src = lookUrl; lk.alt = "look no avatar"; box.appendChild(lk); return; }
     ["bottom", "calcado", "top", "vestido", "casaco"].forEach(function (role) {
       var id = sel[role]; if (!id || !byId[id]) return;
       var p = LAY[role]; var im = el("img"); im.src = byId[id].src; im.alt = byId[id].nome;
@@ -722,30 +725,93 @@
     l.forEach(function (o) { g.appendChild(cardLook(o)); });
     w.appendChild(g);
   }
+  // procura um look já gerado: primeiro chave exata, depois o mais parecido (>=75% em comum)
+  function fotoDoLook(o) {
+    if (o.lookUrl) return o.lookUrl;
+    var P = window.LOOKS_PRONTOS; if (!P) return "";
+    var meus = (o.itens || []).slice().sort();
+    var exato = P[meus.join(",")]; if (exato) return exato;
+    var melhor = "", nota = 0;
+    Object.keys(P).forEach(function (k) {
+      var deles = k.split(",");
+      var comum = 0;
+      deles.forEach(function (id) { if (meus.indexOf(id) >= 0) comum++; });
+      var n = comum / Math.max(deles.length, meus.length);
+      if (n > nota) { nota = n; melhor = P[k]; }
+    });
+    return nota >= 0.75 ? melhor : "";
+  }
   function cardLook(o) {
     var c = el("div", "ocard");
     var box = el("div", "flat");
     var sel = {}, accs = [];
     (o.itens || []).forEach(function (id) { var it = byId[id]; if (!it) return; if (it.cat === "acessorio" || it.cat === "joia" || it.cat === "chapeu") accs.push(id); else sel[it.cat] = id; });
-    flatLay(box, sel, accs, o.lookUrl);
+    var foto = fotoDoLook(o);
+    var modo = S.vis[o.id] || (foto ? "avatar" : "moodboard");
+    if (!foto) modo = "moodboard";
+
+    flatLay(box, sel, accs, foto, modo);
+
+    // alternador moodboard / avatar, em cima da imagem
+    var sw = el("div", "vswitch");
+    [["moodboard", "Moodboard"], ["avatar", "Avatar"]].forEach(function (par) {
+      var b = el("button", "vsw" + (modo === par[0] ? " on" : ""), par[1]);
+      b.type = "button";
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        if (par[0] === "avatar" && !foto) { toast("Esse look ainda não tem foto no avatar. Toque em Gerar eu usando."); return; }
+        S.vis[o.id] = par[0]; save(); looksRender();
+      };
+      sw.appendChild(b);
+    });
+    box.appendChild(sw);
     c.appendChild(box);
+
     var b = el("div", "obody");
     b.appendChild(el("h3", null, o.nome));
     var tg = el("div", "tags");
     tg.appendChild(el("span", "tg mint", EST[o.est] || "—"));
     tg.appendChild(el("span", "tg", (o.itens || []).length + " peças"));
-    if (o.lookUrl) tg.appendChild(el("span", "tg tang", "com foto"));
+    if (foto) tg.appendChild(el("span", "tg tang", "com avatar"));
     b.appendChild(tg);
     var r = el("div", "row");
     var b1 = el("button", "btn sm solid"); b1.innerHTML = svg(IC.spark) + (o.lookUrl ? " Refazer" : " Gerar eu usando");
     b1.onclick = function () { gerarLook(o, b1); }; r.appendChild(b1);
     var b2 = el("button", "btn sm ghost", "Editar"); b2.onclick = function () { abrirMontador(o); }; r.appendChild(b2);
+    var b4 = el("button", "btn sm ghost"); b4.innerHTML = svg(IC.copy || IC.spark); b4.setAttribute("aria-label", "Copiar pedido");
+    b4.title = "Copiar pedido pra eu gerar manualmente";
+    b4.onclick = function () { copiarPedido(o); };
+    r.appendChild(b4);
     var b3 = el("button", "btn sm ghost"); b3.innerHTML = svg(IC.trash); b3.setAttribute("aria-label", "Apagar");
     b3.onclick = function () {
-      S.outfits = S.outfits.filter(function (x) { return x.id !== o.id; }); save(); looksRender(); toast("Look apagado");
+      S.outfits = S.outfits.filter(function (x) { return x.id !== o.id; });
+      delete S.vis[o.id]; save(); looksRender(); toast("Look apagado");
     };
     r.appendChild(b3); b.appendChild(r); c.appendChild(b);
     return c;
+  }
+
+  // modo manual: copia o pedido do look pra ela colar pra mim quando a IA estiver sem crédito
+  function copiarPedido(o) {
+    var linhas = (o.itens || []).map(function (id) {
+      var it = byId[id]; if (!it) return "- " + id;
+      return "- " + it.nome + " (" + id + ")" + (it.det ? " :: " + it.det : "");
+    });
+    var txt = "GERAR LOOK NO AVATAR\nnome: " + o.nome + "\nestacao: " + (EST[o.est] || o.est) +
+      "\nchave: " + (o.itens || []).slice().sort().join(",") + "\npecas:\n" + linhas.join("\n");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(function () { toast("Pedido copiado. Cola pro Claude gerar."); },
+        function () { promptFallback(txt); });
+    } else promptFallback(txt);
+  }
+  function promptFallback(txt) {
+    abrirModal(function (m) {
+      cabeca(m, "Pedido do look", "copie esse texto e mande pro Claude");
+      var f = el("label", "field");
+      var ta = el("textarea"); ta.rows = 10; ta.value = txt; ta.style.width = "100%";
+      f.appendChild(ta); m.appendChild(f);
+      ta.focus(); ta.select();
+    });
   }
 
   function gerarLook(o, btn) {
@@ -763,7 +829,7 @@
         return c.toDataURL("image/jpeg", 0.82);
       });
     }).then(function (jpg) {
-      o.lookUrl = jpg; save(); looksRender(); toast("Look gerado.");
+      o.lookUrl = jpg; S.vis[o.id] = "avatar"; save(); looksRender(); toast("Look gerado.");
     }).catch(function (e) {
       btn.removeAttribute("disabled"); btn.innerHTML = svg(IC.spark) + " Tentar de novo";
       toast(String(e.message || e).slice(0, 190));
@@ -847,7 +913,7 @@
       r.appendChild(bs);
       var be = el("button", "btn ghost"); be.innerHTML = svg(IC.down) + " Backup";
       be.onclick = function () {
-        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del }, null, 1)], { type: "application/json" });
+        var blob = new Blob([JSON.stringify({ outfits: S.outfits, extra: S.extra, fix: S.fix, edit: S.edit, del: S.del, vis: S.vis }, null, 1)], { type: "application/json" });
         var a = document.createElement("a"); a.href = URL.createObjectURL(blob);
         a.download = "guarda-roupa-backup.json"; a.click();
       };
@@ -859,7 +925,7 @@
         var f = e.target.files && e.target.files[0]; if (!f) return;
         f.text().then(function (t) {
           var d = JSON.parse(t);
-          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {}; S.edit = d.edit || {}; S.del = d.del || {};
+          S.outfits = d.outfits || []; S.extra = d.extra || []; S.fix = d.fix || {}; S.edit = d.edit || {}; S.del = d.del || {}; S.vis = d.vis || {};
           save(); location.reload();
         }).catch(function () { toast("Arquivo inválido"); });
       };
