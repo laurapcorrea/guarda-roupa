@@ -46,6 +46,7 @@ window.CATALOGO = [
 ["p022","Camiseta preta básica","top","manga curta","VOP"],
 ["p021","Camiseta preta com logo","top","manga curta","VOP"],
 ["p023","Camiseta preta estampada","top","manga curta","VOP"],
+["new_max_tee_vintage","Max tee vintage branca","top","manga curta","VOP",2,"camiseta branca oversized comprida, gola redonda, manga curta ampla, estampa preta no peito com KEEP CLASSIC ALIVE, VINTAGE em letras grandes, carro clássico e Live A Modern Life"],
 ["p107","Blusa azul com bolsos","top","manga longa","OP"],
 ["p043","Blusa branca manga bufante","top","manga longa","VOP"],
 ["new_blusa_tule_marrom_botoes","Blusa de tule marrom com botões","top","manga longa","VOP",2,"tule transparente marrom terracota, decote V com botões forrados, babados em cascata na frente e nas mangas"],
