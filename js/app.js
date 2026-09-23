@@ -20,7 +20,7 @@
   var SUBS = {
     top: ["alça", "manga curta", "manga longa"],
     bottom: ["calça", "short", "saia"],
-    casaco: ["blazer", "jaqueta", "sobretudo", "cardigã", "kimono"],
+    casaco: ["blazer", "jaqueta", "sobretudo", "cardigã", "kimono", "colete"],
     calcado: ["tênis", "bota", "sandália", "sapato", "chinelo"],
     acessorio: ["bolsa", "cinto", "óculos", "lenço"],
     joia: ["colar", "brinco", "relógio"],
@@ -345,7 +345,7 @@
     var b = el("button", "tile" + (marcado ? " on" : ""));
     b.setAttribute("aria-label", it.nome);
     var im = el("img"); im.src = it.src; im.alt = it.nome; im.loading = "lazy"; b.appendChild(im);
-    if (it.novo) b.appendChild(el("span", "nu"));
+    if (it.pendente) b.appendChild(el("span", "nu"));
     if (it.pendente) b.appendChild(el("span", "tag", "tratar"));
     b.appendChild(el("span", "cap", it.nome));
     b.onclick = onClick; return b;
@@ -476,7 +476,7 @@
 
   function abrirPeca(it) {
     abrirModal(function (m) {
-      cabeca(m, it.nome, it.sub + (it.novo ? " · nova" : ""));
+      cabeca(m, it.nome, it.sub + (it.pendente ? " · sem tratamento" : ""));
       var hero = el("div", "hero"); var im = el("img"); im.src = it.src; im.alt = it.nome; hero.appendChild(im); m.appendChild(hero);
       var f = el("div", "facts");
       [["Categoria", (CATS.filter(function (c) { return c.id === it.cat; })[0] || {}).nome || it.cat],
