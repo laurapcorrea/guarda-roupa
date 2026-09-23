@@ -123,8 +123,14 @@ button{background:none; border:0; cursor:pointer; padding:0}
 .ocard{background:var(--ink-2); border:1px solid var(--line)}
 .flat{position:relative; aspect-ratio:4/5; background:var(--mint); overflow:hidden}
 .flat img{position:absolute; object-fit:contain; height:auto}
-.flat .look{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; mix-blend-mode:normal}
+.flat .look{position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#fff; mix-blend-mode:normal}
 .flat .ph{position:absolute; inset:0; display:grid; place-items:center; color:rgba(14,14,16,.45); font-size:12px}
+.vswitch{position:absolute; left:8px; top:8px; display:flex; gap:2px; padding:2px;
+  background:rgba(14,14,16,.62); border-radius:999px; backdrop-filter:blur(6px); z-index:3}
+.vsw{border:0; background:transparent; color:rgba(255,255,255,.72); font:inherit; font-size:11px;
+  font-weight:700; letter-spacing:-.01em; padding:4px 10px; border-radius:999px; cursor:pointer; line-height:1.2}
+.vsw:hover{color:#fff}
+.vsw.on{background:#fff; color:#111}
 .obody{padding:12px 14px 14px; display:flex; flex-direction:column; gap:9px}
 .obody h3{margin:0; font-weight:700; font-size:19px; letter-spacing:-.04em}
 .tags{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
